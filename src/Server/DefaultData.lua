@@ -1,0 +1,3 @@
+--- @class DefaultData
+--- @ignore
+return {}
