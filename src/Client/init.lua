@@ -3,19 +3,30 @@ type ChangedPackage = {
 	Path : {any}
 }
 
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local cbor = require(ReplicatedStorage:WaitForChild("cbor"))
+
 --- @class Client
 --- @client
 
 local Client = {}
 Client._Data = {}
 Client._ChangedPackages = {}
+Client._MergedSinceLastGet = true
+Client._LastDataDeepCopy = nil
 
 --- Gets the LocalPlayer's current Profile data
 --- @within Client
 --- @return {any} -- The LocalPlayer's Profile data
 
 function Client.Get() : {any}
-	return Client._Data
+	if Client._MergedSinceLastGet then
+		Client._MergedSinceLastGet = false
+		Client._LastDataDeepCopy = Client._DeepCopy(Client._Data)
+	end
+	
+	return Client._LastDataDeepCopy
 end
 
 --[=[
@@ -41,15 +52,7 @@ function Client.ListenToValueChanged(Path : {any}, Callback : (NewValue : any) -
 		Path = Path
 	}
 	
-	local InitialPeek = Client._Data
-	
-	for _, Index : any in Path do
-		InitialPeek = InitialPeek[Index]
-		
-		if InitialPeek == nil then
-			break
-		end
-	end
+	local InitialPeek = Client._GetDataFromPath(Client.Get(), Path)
 	
 	if InitialPeek ~= nil then
 		task.spawn(Callback, InitialPeek)
@@ -89,34 +92,43 @@ end
 --- @within Client
 --- @private
 
+function Client._DeepCopy(Table: {any}) : {any}
+	local Clone = table.clone(Table)
+
+	for Index, Value in Clone do
+		if typeof(Value) == "table" then
+			Clone[Index] = Client._DeepCopy(Value)
+		end
+	end
+
+	return Clone
+end
+
+--- @within Client
+--- @private
+
+function Client._GetDataFromPath(Root, Path)
+	for _, Index : any in Path do
+		Root = Root[Index]
+		
+		if Root == nil then
+			return nil
+		end
+	end
+	
+	return Root
+end
+
+--- @within Client
+--- @private
+
 function Client._FireChangedCallbacks(Added : {any}, Removed : {any})
 	for Package : ChangedPackage in Client._ChangedPackages do
-		local Path = Added
+		local AddedPath = Client._GetDataFromPath(Added, Package.Path)
+		local RemovedPath = Client._GetDataFromPath(Removed, Package.Path)
 		
-		for _, Index : any in Package.Path do
-			Path = Path[Index]
-			
-			if Path == nil then
-				break
-			end
-		end
-		
-		if Path == nil then
-			Path = Removed
-			
-			for _, Index : any in Package.Path do
-				Path = Path[Index]
-
-				if Path == nil then
-					break
-				end
-			end
-			
-			if Path == true then
-				task.spawn(Package.Callback, Path)
-			end
-		else
-			task.spawn(Package.Callback, Path)
+		if AddedPath or RemovedPath then
+			task.spawn(Package.Callback, Client._GetDataFromPath(Client.Get(), Package.Path))
 		end
 	end
 end
@@ -140,6 +152,8 @@ function Client._MergeDiff(ParentTable : {any}, Added : {any}, Removed : {any})
 		end
 	end
 	
+    Client._MergedSinceLastGet = true
+
 	Client._FireChangedCallbacks(Added, Removed)
 end
 

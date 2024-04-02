@@ -1,7 +1,16 @@
+type ChangedPackage = {
+	Callback : (NewValue : any) -> (),
+	Path : {any}
+}
+
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local ProfileService = require(script.ProfileService)
 local DefaultData = require(script.DefaultData)
+
+script.cbor.Parent = ReplicatedStorage
+local cbor = require(ReplicatedStorage.cbor)
 
 local ProfileStore = ProfileService.GetProfileStore({
 	Name = "Alpha",
@@ -44,6 +53,9 @@ function Server.CreateProfile(Player : Player)
 		
 		return
 	end
+
+    Profile._IsUpdating = false
+	Profile._ChangedPackages = {}
 	
 	Server._Profiles[Player] = Profile
 	
@@ -95,13 +107,64 @@ end
 
 function Server.Update(Player : Player, Callback : (Profile : any) -> ())
 	local Profile = Server.Get(Player)
+
+    if Profile._IsUpdating then
+        Callback(Profile)
+
+        return
+    end
+
+    Profile._IsUpdating = true
+
 	local PreviousDataVersion = Server._DeepCopy(Profile.Data)
 	
 	Callback(Profile)
 	
 	local Added, Removed = Server._GetDiff(PreviousDataVersion, Profile.Data)
 	
+	Server._FireChangedCallbacks(Player, Added, Removed)
 	Server._ReplicateDataChange(Player, Added, Removed)
+
+    Profile._IsUpdating = false
+end
+
+--[=[
+	Listens to whenever the specified path's value is changed. The callback will fire upon declaration if the path's value is not nil
+
+	```lua
+	--- Listens to whenever Profile.Data.Currencies.Money for qut100's Profile is changed
+
+	Server.ListenToValueChanged(game.Players.qut100, {"Currencies", "Money"}, function(Money : number)
+		Gui.PathToTextLabel.Text = tostring(Money)
+	end)
+	```
+
+	@within Server
+	@param Player Player -- Target Player
+	@param Path {any} -- The path of the value that is being listened to
+	@param Callback (NewValue : any) -> () -- This function is called whenever the specified path's value is changed
+	@return () -> () -- Disconnect function
+]=]
+
+function Server.ListenToValueChanged(Player : Player, Path : {any}, Callback : (NewValue : any) -> ()) : () -> ()
+	local Profile = Server.Get(Player)
+
+	local Package = {
+		Callback = Callback,
+		Path = Path
+	}
+	
+	local InitialPeek = Server._GetDataFromPath(Profile.Data, Path)
+	
+	if InitialPeek ~= nil then
+		task.spawn(Callback, InitialPeek)
+	end
+	
+	Profile._ChangedPackages[Package] = true
+	
+	return function()
+		Profile._ChangedPackages[Package] = nil
+	end
 end
 
 --[=[
@@ -126,6 +189,9 @@ end
 ]=]
 
 function Server._ReplicateDataChange(Player : Player, Added : {any}, Removed : {any})
+	Added = cbor.encode(Added)
+	Removed = cbor.encode(Removed)
+
 	
 end
 
@@ -142,6 +208,37 @@ function Server._DeepCopy(Table: {any}) : {any}
 	end
 
 	return Clone
+end
+
+--- @within Server
+--- @private
+
+function Server._GetDataFromPath(Root, Path)
+	for _, Index : any in Path do
+		Root = Root[Index]
+		
+		if Root == nil then
+			return nil
+		end
+	end
+	
+	return Root
+end
+
+--- @within Server
+--- @private
+
+function Server._FireChangedCallbacks(Player : Player, Added : {any}, Removed : {any})
+	local Profile = Server.Get(Player)
+
+	for Package : ChangedPackage in Profile._ChangedPackages do
+		local AddedPath = Server._GetDataFromPath(Added, Package.Path)
+		local RemovedPath = Server._GetDataFromPath(Removed, Package.Path)
+		
+		if AddedPath or RemovedPath then
+			task.spawn(Package.Callback, Server._GetDataFromPath(Profile.Data, Package.Path))
+		end
+	end
 end
 
 --- @within Server
