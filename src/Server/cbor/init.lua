@@ -18,6 +18,8 @@ local s_pack = string.pack
 local s_unpack = string.unpack
 local b_rshift = bit32.rshift
 
+local RobloxConverters = require(script.Convertors)
+
 -- sanity check
 if s_pack and s_pack(">I2", 0) ~= "\0\0" then
 	s_pack = nil;
@@ -184,6 +186,14 @@ end
 encoder["nil"] = function() return "\246"; end
 
 function encoder.userdata(ud, opts)
+	if RobloxConverters[typeof(ud)] then
+		local t = typeof(ud)
+		local s = RobloxConverters[t](true, ud)
+		local encoded = integer(#t + #s + 2, 64) .. "\247" .. t .. "\248" .. s
+		
+		return encoded
+	end
+	
 	local mt = getmetatable(ud);
 	if mt then
 		local encode_ud = opts and opts[mt] or mt.__tocbor;
@@ -272,7 +282,7 @@ end
 -- Decoder
 -- Reads from a file-handle like object
 local function read_bytes(fh, len)
-	return fh:read(len);
+	return fh:read(len)
 end
 
 local function read_byte(fh)
@@ -315,7 +325,19 @@ end
 
 local function read_string(fh, mintyp)
 	if mintyp ~= 31 then
-		return read_bytes(fh, read_length(fh, mintyp));
+		local str, pos = fh:getStringAndPos()
+		local startingByte = string.sub(str, pos, pos):byte()
+		local decoded = read_bytes(fh, read_length(fh, mintyp))
+		
+		if startingByte == 247 then
+			local split = string.split(decoded:sub(2, -1), "\248")
+			
+			assert(RobloxConverters[split[1]], `Roblox Converter for type '{split[1]}' doesnt exist\nfull string: '{decoded}'`)
+			
+			return RobloxConverters[split[1]](false, split[2])
+		else
+			return decoded
+		end
 	end
 	local out = {};
 	local i = 1;
@@ -531,6 +553,10 @@ local function decode(s, opts)
 			pos = 1;
 		end
 		return #bytes;
+	end
+	
+	function fh:getStringAndPos()
+		return s, pos
 	end
 
 	return read_object(fh, opts);
