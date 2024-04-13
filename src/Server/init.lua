@@ -9,8 +9,15 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ProfileService = require(script.ProfileService)
 local DefaultData = require(script.DefaultData)
 
-script.cbor.Parent = ReplicatedStorage
-local cbor = require(ReplicatedStorage.cbor)
+local cborModule = script.cbor
+cborModule.Name = "PLAYER_DATA_SERIALIZER"
+cborModule.Parent = ReplicatedStorage
+
+local cbor = require(cborModule)
+
+local PlayerDataChangedRemote = Instance.new("RemoteEvent")
+PlayerDataChangedRemote.Name = "PLAYER_DATA_CHANGED"
+PlayerDataChangedRemote.Parent = ReplicatedStorage
 
 local ProfileStore = ProfileService.GetProfileStore({
 	Name = "Alpha",
@@ -168,31 +175,19 @@ function Server.ListenToValueChanged(Player : Player, Path : {any}, Callback : (
 end
 
 --[=[
-	:::caution
-	### This should not be called manually, and instead should be edited by the developer to properly replicate data to the Player.
-
-	```lua
-	-- Example Code:
-	function Server._ReplicateDataChange(Player : Player, Added : {any}, Removed : {any})
-		local Remotes = require(game.ReplicatedStorage.Remotes)
-		Remotes.Fire("ReplicateData", Player, Added, Removed)
-	end
-	```
-	:::
-
-	Replicates added and removed data to the specified Player
-
 	@within Server
-	@param Player Player -- The specified Player
-	@param Added {any} -- Any data that was added
-	@param Removed {any} -- Any data that was removed
+	@private
 ]=]
 
 function Server._ReplicateDataChange(Player : Player, Added : {any}, Removed : {any})
+	if not (next(Added) or next(Removed)) then
+		return
+	end
+
 	Added = cbor.encode(Added)
 	Removed = cbor.encode(Removed)
 
-	
+	PlayerDataChangedRemote:FireClient(Player, Added, Removed)
 end
 
 --- @within Server

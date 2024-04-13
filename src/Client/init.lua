@@ -5,7 +5,9 @@ type ChangedPackage = {
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local cbor = require(ReplicatedStorage:WaitForChild("cbor"))
+local cbor = require(ReplicatedStorage:WaitForChild("PLAYER_DATA_SERIALIZER"))
+
+local DataChangedRemote = ReplicatedStorage:WaitForChild("PLAYER_DATA_CHANGED")
 
 --- @class Client
 --- @client
@@ -13,7 +15,6 @@ local cbor = require(ReplicatedStorage:WaitForChild("cbor"))
 local Client = {}
 Client._Data = {}
 Client._ChangedPackages = {}
-Client._MergedSinceLastGet = true
 Client._LastDataDeepCopy = nil
 
 --- Gets the LocalPlayer's current Profile data
@@ -21,11 +22,6 @@ Client._LastDataDeepCopy = nil
 --- @return {any} -- The LocalPlayer's Profile data
 
 function Client.Get() : {any}
-	if Client._MergedSinceLastGet then
-		Client._MergedSinceLastGet = false
-		Client._LastDataDeepCopy = Client._DeepCopy(Client._Data)
-	end
-	
 	return Client._LastDataDeepCopy
 end
 
@@ -66,27 +62,18 @@ function Client.ListenToValueChanged(Path : {any}, Callback : (NewValue : any) -
 end
 
 --[=[
-	:::caution
-	### This should not be called manually, and instead should be edited by the developer to properly listen for data changes from the server.
-
-	```lua
-	-- Example:
-	function Client._ListenToDataChanges()
-		local Remotes = require(game:GetService("ReplicatedStorage"):WaitForChild("Remotes"))
-		Remotes.OnEvent("ReplicateData", function(Added, Removed)
-			Client._MergeDiff(Client._Data, Added, Removed)
-		end)
-	end
-	```
-	:::
-
-	Starts listening to any data changes that the server sends
-
 	@within Client
+	@private
 ]=]
 
 function Client._ListenToDataChanges()
-	
+	DataChangedRemote.OnClientEvent:Connect(function(Added, Removed)
+		Client._MergeDiff(Client._Data, cbor.decode(Added), cbor.decode(Removed))
+
+		Client._LastDataDeepCopy = Client._DeepCopy(Client._Data)
+
+		Client._FireChangedCallbacks(Added, Removed)
+	end)
 end
 
 --- @within Client
@@ -151,10 +138,6 @@ function Client._MergeDiff(ParentTable : {any}, Added : {any}, Removed : {any})
 			ParentTable[Index] = nil
 		end
 	end
-	
-    Client._MergedSinceLastGet = true
-
-	Client._FireChangedCallbacks(Added, Removed)
 end
 
 Client._ListenToDataChanges()
