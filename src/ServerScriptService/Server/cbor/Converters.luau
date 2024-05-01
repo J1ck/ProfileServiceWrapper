@@ -42,7 +42,7 @@ do
 	end
 end
 
-return {
+local Methods = {
 	["EnumItem"] = function(isClass,value) 
 		if isClass then 
 			return string.pack("I2", EnumItemToIndex[value])
@@ -268,3 +268,41 @@ return {
 		end
 	end
 }
+
+local IndexToType = {}
+local TypeToIndex = {}
+
+do
+	local Index = 1
+
+	for Type in Methods do
+		IndexToType[Index] = Type
+		TypeToIndex[Type] = Index
+
+		Index += 1
+	end
+end
+
+local Converters = {}
+
+function Converters.canSerialize(Data) : boolean
+	return Methods[typeof(Data)] ~= nil
+end
+
+function Converters.encode(Data) : string
+	assert(Converters.canSerialize(Data), `type '{typeof(Data)}' is not serializable`)
+
+	local Type = string.pack("I1", TypeToIndex[typeof(Data)])
+	local Encoded = Methods[typeof(Data)](true, Data)
+
+	return Type .. "\248" .. Encoded
+end
+
+function Converters.decode(Data : string)
+	local Split = string.split(Data, "\248")
+	local Type = IndexToType[string.unpack("I1", Split[1])]
+
+	return Type ~= nil and Methods[Type](false, Split[2]) or nil
+end
+
+return Converters

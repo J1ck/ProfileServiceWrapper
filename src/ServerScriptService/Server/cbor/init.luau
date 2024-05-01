@@ -18,7 +18,7 @@ local s_pack = string.pack
 local s_unpack = string.unpack
 local b_rshift = bit32.rshift
 
-local RobloxConverters = require(script.Convertors)
+local RobloxConverters = require(script.Converters)
 
 -- sanity check
 if s_pack and s_pack(">I2", 0) ~= "\0\0" then
@@ -186,12 +186,14 @@ end
 encoder["nil"] = function() return "\246"; end
 
 function encoder.userdata(ud, opts)
-	if RobloxConverters[typeof(ud)] then
-		local t = typeof(ud)
-		local s = RobloxConverters[t](true, ud)
-		local encoded = integer(#t + #s + 2, 64) .. "\247" .. t .. "\248" .. s
+	if RobloxConverters.canSerialize(ud) then
+		-- local t = typeof(ud)
+		-- local s = RobloxConverters[t](true, ud)
+		-- local encoded = integer(#t + #s + 2, 64) .. "\247" .. t .. "\248" .. s
+
+		local encoded = RobloxConverters.encode(ud)
 		
-		return encoded
+		return integer(#encoded, 64) .. encoded
 	end
 	
 	local mt = getmetatable(ud);
@@ -328,16 +330,19 @@ local function read_string(fh, mintyp)
 		local str, pos = fh:getStringAndPos()
 		local startingByte = string.sub(str, pos, pos):byte()
 		local decoded = read_bytes(fh, read_length(fh, mintyp))
+
+		return RobloxConverters.decode(decoded) or decoded
 		
-		if startingByte == 247 then
-			local split = string.split(decoded:sub(2, -1), "\248")
+		-- if startingByte == 247 then
+		-- 	-- local split = string.split(decoded:sub(2, -1), "\248")
 			
-			assert(RobloxConverters[split[1]], `Roblox Converter for type '{split[1]}' doesnt exist\nfull string: '{decoded}'`)
+		-- 	-- assert(RobloxConverters[split[1]], `Roblox Converter for type '{split[1]}' doesnt exist\nfull string: '{decoded}'`)
 			
-			return RobloxConverters[split[1]](false, split[2])
-		else
-			return decoded
-		end
+		-- 	-- return RobloxConverters[split[1]](false, split[2])
+		-- 	return RobloxConverters.decode(decoded:sub(2, -1))
+		-- else
+		-- 	return decoded
+		-- end
 	end
 	local out = {};
 	local i = 1;
