@@ -30,9 +30,8 @@ local ProfileStore = ProfileService.GetProfileStore({
 local Server = {}
 Server._Profiles = {}
 
---- Attempts to load the specified Player's Profile
+--- Attempts to load the specified ``Player``'s ``Profile``
 --- @within Server
---- @param Player Player -- The specified Player
 
 function Server.CreateProfile(Player : Player)
 	if Server._Profiles[Player] then
@@ -69,9 +68,8 @@ function Server.CreateProfile(Player : Player)
 	Server._ReplicateDataChange(Player, Profile.Data, {})
 end
 
---- Attempts to unload the specified Player's Profile
+--- Attempts to unload the specified ``Player``'s ``Profile``
 --- @within Server
---- @param Player Player -- The specified Player
 
 function Server.RemoveProfile(Player : Player)
 	if Server._Profiles[Player] then
@@ -80,12 +78,18 @@ function Server.RemoveProfile(Player : Player)
 end
 
 --[=[
-	Attempts to get the specified Player's Profile. Will only yield if the specified Player's Profile doesn't already exist
+	Attempts to get the specified ``Player``'s ``Profile``
+
+	:::info
+	Will only yield if the specified ``Player``'s ``Profile`` doesn't already exist
+	:::
+
+	:::caution
+	Will error if the specified ``Player`` leaves during invocation
+	:::
 
 	@within Server
 	@yields
-	@param Player Player -- The specified Player
-	@return any -- The specified Player's Profile
 ]=]
 
 function Server.Get(Player : Player) : any
@@ -98,19 +102,43 @@ function Server.Get(Player : Player) : any
 	return Server._Profiles[Player]
 end
 
---- Gets the specified Player's Profile without yielding
+--- Gets the specified ``Player``'s ``Profile`` without yielding
 --- @within Server
---- @param Player Player -- The specified Player
---- @return any? -- The specified Player's Profile (if it exists)
 
 function Server.Peek(Player : Player) : any?
 	return Server._Profiles[Player]
 end
 
---- Use this function to update the specified Player's Profile data
---- @within Server
---- @param Player Player -- The specified Player
---- @param Callback (Profile : any) -> () -- Update the specified Player's data inside of this function
+--[=[
+	Update's the specified ``Player``'s ``Profile`` Data
+
+	:::warning
+	This should be the **only** way you update a ``Player``'s ``Profile``
+	:::
+	
+	:::info
+	Will only yield if the ``Callback`` yields
+	:::
+
+	:::tip
+	It is safe to call this function inside of itself, but is not recommended
+	:::
+
+	```lua
+	-- Example Usage
+	Server.Update(game.Players.qut100, function(Profile)
+		Profile.Data.Coins += 10
+
+		if Profile.Data.Coins > 50 then
+			Profile.Data.Coins -= 50
+			Profile.Data.Gems += 1
+		end
+	end)
+	```
+
+	@within Server
+	@yields
+]=]
 
 function Server.Update(Player : Player, Callback : (Profile : any) -> ())
 	local Profile = Server.Get(Player)
@@ -136,24 +164,34 @@ function Server.Update(Player : Player, Callback : (Profile : any) -> ())
 end
 
 --[=[
-	Listens to whenever the specified path's value is changed. The callback will fire upon declaration if the path's value is not nil
+	Listens to whenever the specified ``Path``'s value is changed
+
+	:::info
+	``Callback`` will fire upon declaration if the ``Path``'s value is not ``nil``
+	:::
 
 	```lua
-	--- Listens to whenever Profile.Data.Currencies.Money for qut100's Profile is changed
-
-	Server.ListenToValueChanged(game.Players.qut100, {"Currencies", "Money"}, function(Money : number)
-		Gui.PathToTextLabel.Text = tostring(Money)
+	--- Example Usage
+	local Player = game.Players.qut100
+	local Disconnect = Server.ListenToValueChanged(Player, {"Currencies", "Money"}, function(Money : number)
+		if Money > 50 then
+			Server.Update(Player, function(Profile)
+				Profile.Data.Gems += 1
+			end)
+		end
 	end)
+
+	task.delay(5, Disconnect)
 	```
 
 	@within Server
-	@param Player Player -- Target Player
-	@param Path {any} -- The path of the value that is being listened to
-	@param Callback (NewValue : any) -> () -- This function is called whenever the specified path's value is changed
+	@param Player Player
+	@param Path {string} -- {"Index", "NestedIndex"} -> Table.Index.NestedIndex
+	@param Callback (NewValue : any) -> ()
 	@return () -> () -- Disconnect function
 ]=]
 
-function Server.ListenToValueChanged(Player : Player, Path : {any}, Callback : (NewValue : any) -> ()) : () -> ()
+function Server.ListenToValueChanged(Player : Player, Path : {string}, Callback : (NewValue : any) -> ()) : () -> ()
 	local Profile = Server.Get(Player)
 
 	local Package = {
@@ -175,8 +213,8 @@ function Server.ListenToValueChanged(Player : Player, Path : {any}, Callback : (
 end
 
 --[=[
-	@within Server
-	@private
+@within Server
+@private
 ]=]
 
 function Server._ReplicateDataChange(Player : Player, Added : {any}, Removed : {any})
@@ -208,7 +246,7 @@ end
 --- @within Server
 --- @private
 
-function Server._GetDataFromPath(Root, Path)
+function Server._GetDataFromPath(Root : {[any] : any}, Path : {string})
 	for _, Index : any in Path do
 		Root = Root[Index]
 		

@@ -30,6 +30,8 @@ end
 
 local _ENV = nil; -- luacheck: ignore 211
 
+--- @class encoder
+--- @ignore
 local encoder = {};
 
 local function encode(obj, opts)
@@ -89,6 +91,8 @@ if s_pack then
 	end
 end
 
+--- @class simple_mt
+--- @ignore
 local simple_mt = {};
 function simple_mt:__tostring() return self.name or ("simple(%d)"):format(self.value); end
 function simple_mt:__tocbor() return self.cbor or integer(self.value, 224); end
@@ -98,6 +102,8 @@ local function simple(value, name, cbor)
 	return setmetatable({ value = value, name = name, cbor = cbor }, simple_mt);
 end
 
+--- @class tagged_mt
+--- @ignore
 local tagged_mt = {};
 function tagged_mt:__tostring() return ("%d(%s)"):format(self.tag, tostring(self.value)); end
 function tagged_mt:__tocbor() return integer(self.tag, 192) .. encode(self.value); end
@@ -305,6 +311,8 @@ local function read_length(fh, mintyp)
 	end
 end
 
+--- @class decoder
+--- @ignore
 local decoder = {};
 
 local function read_type(fh)
@@ -567,7 +575,9 @@ local function decode(s, opts)
 	return read_object(fh, opts);
 end
 
-return {
+--- @class exposed
+--- @ignore
+local Exposed ={
 	-- en-/decoder functions
 	encode = encode;
 	decode = decode;
@@ -588,3 +598,5 @@ return {
 	null = null;
 	undefined = undefined;
 };
+
+return Exposed

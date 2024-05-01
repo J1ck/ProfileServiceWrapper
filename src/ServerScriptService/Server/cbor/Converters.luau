@@ -26,10 +26,15 @@ end
 function getNativeSize(forceType) 
 	return #string.pack(forceType or valueType ,1) 
 end
---- Nice Binary Functions^^^^^^^^^^ Lazy formatting/macros
 
+--- @class indextoenum
+--- @ignore
 local IndexToEnumItem = {}
+
+--- @class enumtoindex
+--- @ignore
 local EnumItemToIndex = {}
+
 do
 	local i = 0
 	for _,v in Enum:GetEnums() do
@@ -42,6 +47,8 @@ do
 	end
 end
 
+--- @class methods
+--- @ignore
 local Methods = {
 	["EnumItem"] = function(isClass,value) 
 		if isClass then 
@@ -269,7 +276,12 @@ local Methods = {
 	end
 }
 
+--- @class indextotype
+--- @ignore
 local IndexToType = {}
+
+--- @class typetoindex
+--- @ignore
 local TypeToIndex = {}
 
 do
@@ -283,6 +295,8 @@ do
 	end
 end
 
+--- @class converters
+--- @ignore
 local Converters = {}
 
 function Converters.canSerialize(Data) : boolean

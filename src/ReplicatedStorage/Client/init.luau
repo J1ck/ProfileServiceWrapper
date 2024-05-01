@@ -17,32 +17,44 @@ Client._Data = {}
 Client._ChangedPackages = {}
 Client._LastDataDeepCopy = nil
 
---- Gets the LocalPlayer's current Profile data
---- @within Client
---- @return {any} -- The LocalPlayer's Profile data
+--[=[
+	Gets the ``LocalPlayer``'s current ``Profile`` Data
+
+	:::info
+	``Client.Get()`` is the same as ``Server.Get(LocalPlayer).Profile.Data``
+	:::
+
+	@within Client
+	@return {any}
+]=]
 
 function Client.Get() : {any}
 	return Client._LastDataDeepCopy
 end
 
 --[=[
-	Listens to whenever the specified path's value is changed. The callback will fire upon declaration if the path's value is not nil
+	Listens to whenever the specified ``Path``'s value is changed
+
+	:::info
+	``Callback`` will fire upon declaration if the ``Path``'s value is not ``nil``
+	:::
 
 	```lua
-	--- Listens to whenever Profile.Data.Currencies.Money is changed
-
-	Client.ListenToValueChanged({"Currencies", "Money"}, function(Money : number)
+	--- Example Usage
+	local Disconnect = Client.ListenToValueChanged({"Currencies", "Money"}, function(Money : number)
 		Gui.PathToTextLabel.Text = tostring(Money)
 	end)
+
+	task.delay(5, Disconnect)
 	```
 
 	@within Client
-	@param Path {any} -- The path of the value that is being listened to
-	@param Callback (NewValue : any) -> () -- This function is called whenever the specified path's value is changed
+	@param Path {string} -- {"Index", "NestedIndex"} -> Table.Index.NestedIndex
+	@param Callback (NewValue : any) -> ()
 	@return () -> () -- Disconnect function
 ]=]
 
-function Client.ListenToValueChanged(Path : {any}, Callback : (NewValue : any) -> ()) : () -> ()
+function Client.ListenToValueChanged(Path : {string}, Callback : (NewValue : any) -> ()) : () -> ()
 	local Package = {
 		Callback = Callback,
 		Path = Path
@@ -94,7 +106,7 @@ end
 --- @within Client
 --- @private
 
-function Client._GetDataFromPath(Root, Path)
+function Client._GetDataFromPath(Root : {[any] : any}, Path : {string})
 	for _, Index : any in Path do
 		Root = Root[Index]
 		
