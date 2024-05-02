@@ -20,6 +20,10 @@ Client._LastDataDeepCopy = nil
 --[=[
 	Gets the ``LocalPlayer``'s current ``Profile`` Data
 
+	:::caution
+	Will yeild if the ``LocalPlayer``'s Data hasn't loaded
+	:::
+
 	:::info
 	``Client.Get()`` is the same as ``Server.Get(LocalPlayer).Profile.Data``
 	:::
@@ -29,6 +33,10 @@ Client._LastDataDeepCopy = nil
 ]=]
 
 function Client.Get() : {any}
+	while not Client._LastDataDeepCopy do
+		task.wait()
+	end
+
 	return Client._LastDataDeepCopy
 end
 
@@ -80,7 +88,9 @@ end
 
 function Client._ListenToDataChanges()
 	DataChangedRemote.OnClientEvent:Connect(function(Added, Removed)
-		Client._MergeDiff(Client._Data, cbor.decode(Added), cbor.decode(Removed))
+		Added, Removed = cbor.decode(Added), cbor.decode(Removed)
+
+		Client._MergeDiff(Client._Data, Added, Removed)
 
 		Client._LastDataDeepCopy = Client._DeepCopy(Client._Data)
 

@@ -62,6 +62,7 @@ function Server.CreateProfile(Player : Player)
 
     Profile._IsUpdating = false
 	Profile._ChangedPackages = {}
+	Profile._UpdateQueue = {}
 	
 	Server._Profiles[Player] = Profile
 	
@@ -115,13 +116,9 @@ end
 	:::warning
 	This should be the **only** way you update a ``Player``'s ``Profile``
 	:::
-	
-	:::info
-	Will only yield if the ``Callback`` yields
-	:::
 
-	:::tip
-	It is safe to call this function inside of itself, but is not recommended
+	:::info
+	If a ``Player``'s ``Profile`` tries to be updated while already being updated (eg. asynchronous collisions or recursively called), any subsequent updates will be added to a queue and fired synchronously in order. The first update will yield until the queue has been fully flushed
 	:::
 
 	```lua
@@ -143,24 +140,45 @@ end
 function Server.Update(Player : Player, Callback : (Profile : any) -> ())
 	local Profile = Server.Get(Player)
 
-    if Profile._IsUpdating then
-        Callback(Profile)
+	if Profile._IsUpdating then
+		print(`added to queue {#Profile._UpdateQueue}`)
 
-        return
-    end
+		table.insert(Profile._UpdateQueue, Callback)
+
+		return
+	end
+
+	print("started updating")
 
     Profile._IsUpdating = true
 
 	local PreviousDataVersion = Server._DeepCopy(Profile.Data)
 	
 	Callback(Profile)
-	
+
 	local Added, Removed = Server._GetDiff(PreviousDataVersion, Profile.Data)
-	
-	Server._FireChangedCallbacks(Player, Added, Removed)
+
 	Server._ReplicateDataChange(Player, Added, Removed)
+	Server._FireChangedCallbacks(Player, Added, Removed)
+
+	while #Profile._UpdateQueue > 0 do
+		PreviousDataVersion = Server._DeepCopy(Profile.Data)
+
+		Profile._UpdateQueue[1](Profile)
+
+		table.remove(Profile._UpdateQueue, 1)
+
+		Added, Removed = Server._GetDiff(PreviousDataVersion, Profile.Data)
+
+		Server._ReplicateDataChange(Player, Added, Removed)
+		Server._FireChangedCallbacks(Player, Added, Removed)
+
+		print("iterated")
+	end
 
     Profile._IsUpdating = false
+
+	print("stopped updating")
 end
 
 --[=[
