@@ -141,14 +141,10 @@ function Server.Update(Player : Player, Callback : (Profile : any) -> ())
 	local Profile = Server.Get(Player)
 
 	if Profile._IsUpdating then
-		print(`added to queue {#Profile._UpdateQueue}`)
-
 		table.insert(Profile._UpdateQueue, Callback)
 
 		return
 	end
-
-	print("started updating")
 
     Profile._IsUpdating = true
 
@@ -172,13 +168,9 @@ function Server.Update(Player : Player, Callback : (Profile : any) -> ())
 
 		Server._ReplicateDataChange(Player, Added, Removed)
 		Server._FireChangedCallbacks(Player, Added, Removed)
-
-		print("iterated")
 	end
 
     Profile._IsUpdating = false
-
-	print("stopped updating")
 end
 
 --[=[

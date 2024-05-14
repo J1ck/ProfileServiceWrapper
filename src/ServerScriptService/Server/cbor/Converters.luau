@@ -93,7 +93,6 @@ local Methods = {
 		if isClass then 
 			local C3 = ColorKeypoint.Value
 			local r, g, b = math.floor(C3.R*255), math.floor(C3.G*255), math.floor(C3.B*255)
-			print(r,g,b)
 			return string.pack("f I1 I1 I1",ColorKeypoint.Time,r,g,b) --  further optimizations are possible to store
 		else
 			local Time , r,g,b  = string.unpack("f I1 I1 I1",ColorKeypoint)
